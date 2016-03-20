@@ -34,8 +34,8 @@ PARSER = argparse.ArgumentParser(description='Openssl tools')
 PARSER.add_argument("-gen","--gencert", action='store_true',
                     help='Generate a new certificat')
 PARSER.add_argument("-s", "--subject", type=str,
-                    help='Subject countryName, localityName, organizationalUnitName (Default : /C=FR/L=Paris/O=redhat/OU=rcip)',
-                    default="/C=FR/L=Paris/O=redhat/OU=rcip")
+                    help='Subject countryName, localityName, organizationalUnitName (Default : C=FR/L=Paris/O=redhat/OU=rcip)',
+                    default="C=FR/L=Paris/O=redhat/OU=rcip")
 PARSER.add_argument("-cn", "--common-name", type=str,
                     help='CommonName (Default : *.rcip.redhat.com)',
                     default="*.rcip.redhat.com")
@@ -76,6 +76,7 @@ class Ssltools(object):
                  sanip=None,
                  rootcert_name="ca.crt",
                  rootkey_name="ca.key",
+                 cn_rootcert="Certificate Authority",
                  cert_name="server.crt",
                  key_name="server.key",
                  srl_file="file.srl",
@@ -89,12 +90,12 @@ class Ssltools(object):
         self.sandns = sandns
         self.rootcert_name = rootcert_name
         self.rootkey_name = rootkey_name
+        self.cn_rootcert = cn_rootcert
         self.cert_name = rootcert_name
         self.key_name = rootkey_name
         self.srl_file = srl_file
         self.certs_path = certs_path
 
-        print "%s" % self.cn
 
         self._create_rootcert()
         #create_rootcert()
@@ -115,17 +116,70 @@ class Ssltools(object):
         #gen_chain_cert
         #cat test.pem test.key ca.pem > chain_test.pem
 
-    def _create_rootcert(self):
+    def create_pkey(self,certs_path,pkey_name):
+        pkey = crypto.PKey()
+        pkey.generate_key(TYPE_RSA, self.bits)
+        open("%s/%s" % (certs_path, pkey_name), 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
+        return pkey
 
+    def create_req(self, pkey, digest="md5", **name):
+        """
+        Create a certificate request.
+        Arguments: pkey   - The key to associate with the request
+                   digest - Digestion method to use for signing, default is md5
+                   **name - The name of the subject of the request, possible
+                            arguments are:
+                                                          C     - Country name
+                              ST    - State or province name
+                              L     - Locality name
+                              O     - Organization name
+                              OU    - Organizational unit name
+                              CN    - Common name
+                              emailAddress - E-mail address
+        Returns:   The certificate request in an X509Req object
+        """
+
+        req = crypto.X509Req()
+        subj = req.get_subject()
+
+        for (key,value) in name.items():
+                    setattr(subj, key, value)
+
+        req.set_pubkey(pkey)
+        req.sign(pkey, digest)
+        return req
+
+    def create_cert(self):
+        pass
+
+
+    def _create_rootcert(self):
         #create certs directory
-        
+        print "[Create rootCert/Key]" 
         if not os.path.exists(self.certs_path):
                 os.makedirs(self.certs_path)
 
-        pkey = crypto.PKey()
-        pkey.generate_key(TYPE_RSA, self.bits)
-        open("certs/%s" % self.rootkey_name, 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
-        print pkey
+        print "  [Create %s]" % self.rootkey_name
+        if not os.path.exists("%s/%s" % (self.certs_path, self.rootkey_name)):
+                pkey=self.create_pkey(certs_path=self.certs_path, pkey_name=self.rootkey_name)
+        else:
+                print "    %s/%s Already exist [Keep the existing]" % (self.certs_path, self.rootkey_name)
+                existing_pkey=open("%s/%s" % (self.certs_path, self.rootkey_name), 'r').read()
+                pkey=crypto.load_privatekey(crypto.FILETYPE_PEM, existing_pkey)
+
+
+        print "  [Create req]"
+        if not os.path.exists("%s/%s" % (self.certs_path, self.rootcert_name)):
+                subject=dict(item.split("=") for item in self.subject.split("/"))
+                print subject
+                req=self.create_req(pkey, **subject)
+
+
+        print "  [Create %s]" % self.rootcert_name
+        if not os.path.exists("%s/%s" % (self.certs_path, self.rootcert_name)):
+                cert=self.create_cert()
+        else:
+                print "    %s/%s Already exist [Keep the existing]" % (self.certs_path, self.rootcert_name)
 
    # def _auth(self):
    #     cmd = ("oc login %s:%s -u%s -p%s --insecure-skip-tls-verify=True 2>&1 > /dev/null"
