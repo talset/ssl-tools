@@ -117,6 +117,12 @@ class Ssltools(object):
         #cat test.pem test.key ca.pem > chain_test.pem
 
     def create_pkey(self,certs_path,pkey_name):
+        """
+        Create private key.
+        Arguments: certs_path - Certificats directory
+                   pkey_name - Name for the private key
+        Returns:   The private key generated
+        """
         pkey = crypto.PKey()
         pkey.generate_key(TYPE_RSA, self.bits)
         open("%s/%s" % (certs_path, pkey_name), 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
