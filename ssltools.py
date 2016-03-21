@@ -149,7 +149,8 @@ class Ssltools(object):
                 cert=self.create_cert(req, (req, pkey), 0, (0, 60*60*24*int(self.days)),certs_path=self.certs_path,cert_name=self.rootcert_name)
         else:
                 print "    %s/%s Already exist [Keep the existing]" % (self.certs_path, self.rootcert_name)
-                #TODO read the cert
+                existing_cert=open("%s/%s" % (self.certs_path, self.rootcert_name), 'r').read()
+                cert=crypto.load_certificate(crypto.FILETYPE_PEM, existing_cert)
 
 
     def create_pkey(self,certs_path,pkey_name):
