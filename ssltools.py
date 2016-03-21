@@ -66,6 +66,11 @@ class Ssltools(object):
     def __init__(self):
         pass
 
+################################
+#
+#         Cert part
+#
+################################
 
     def gen_cert(self,
                  subject=None,
@@ -274,6 +279,40 @@ class Ssltools(object):
         open("%s/%s" % (certs_path, srl_file), 'w').write(str(serial))
 
 
+################################
+#
+#         Verify part
+#
+################################
+
+    def verify_key(self, pkey_path):
+        print pkey_path
+        existing_pkey=open("%s" % (pkey_path), 'r').read()
+        pkey=crypto.load_privatekey(crypto.FILETYPE_PEM, existing_pkey)
+
+        #print "%s\n" % existing_pkey
+        if pkey.type() == 6:
+                ktype='RSA'
+        elif pkey.type() == 116:
+                ktype='DSA'
+        else:
+                ktype='Unknow'
+
+        print "Type: %s" % ktype
+        print "Bits: %s" % pkey.bits()
+        print "Consistency: %s" % pkey.check()
+
+        #FILETYPE_ASN1 = 2
+        #FILETYPE_PEM = 1
+        #FILETYPE_TEXT = 65535
+
+
+      #if key.startswith('-----BEGIN '):
+      #            pkey = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
+      #else:
+      #            pkey = crypto.load_pkcs12(key, password).get_privatekey()
+      #return OpenSSLSigner(pkey)
+
    # def _auth(self):
    #     cmd = ("oc login %s:%s -u%s -p%s --insecure-skip-tls-verify=True 2>&1 > /dev/null"
    #            % (self.host, self.port, self.username, self.password))
@@ -292,14 +331,10 @@ if __name__ == "__main__":
         print "version: %s" % (VERSION)
         sys.exit(0)
 
-    #if not ARGS.token:
-    #    PARSER.print_help()
-    #    sys.exit(STATE_UNKNOWN)
-
     tools = Ssltools()
 
-#    ARGS.verify_key
-
+    if ARGS.verify_key:
+        tools.verify_key(ARGS.verify_key)
 
     if ARGS.gencert:
         tools.gen_cert(subject=ARGS.subject,
