@@ -96,12 +96,14 @@ class Ssltools(object):
         self.srl_file = srl_file
         self.certs_path = certs_path
 
-
         self._create_rootcert()
         #create_rootcert()
         #root CA and key
         #openssl genrsa -out ca.key 4096
         #openssl req -days 3650 -out ca.pem -new -x509 -subj /C=FR/L=Paris/O=redhat/OU=redhat
+
+
+
 
         #create_req_cert()
         #openssl genrsa -out test.key 2048
@@ -115,49 +117,6 @@ class Ssltools(object):
 
         #gen_chain_cert
         #cat test.pem test.key ca.pem > chain_test.pem
-
-    def create_pkey(self,certs_path,pkey_name):
-        """
-        Create private key.
-        Arguments: certs_path - Certificats directory
-                   pkey_name - Name for the private key
-        Returns:   The private key generated
-        """
-        pkey = crypto.PKey()
-        pkey.generate_key(TYPE_RSA, self.bits)
-        open("%s/%s" % (certs_path, pkey_name), 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
-        return pkey
-
-    def create_req(self, pkey, digest="md5", **name):
-        """
-        Create a certificate request.
-        Arguments: pkey   - The key to associate with the request
-                   digest - Digestion method to use for signing, default is md5
-                   **name - The name of the subject of the request, possible
-                            arguments are:
-                                                          C     - Country name
-                              ST    - State or province name
-                              L     - Locality name
-                              O     - Organization name
-                              OU    - Organizational unit name
-                              CN    - Common name
-                              emailAddress - E-mail address
-        Returns:   The certificate request in an X509Req object
-        """
-
-        req = crypto.X509Req()
-        subj = req.get_subject()
-
-        for (key,value) in name.items():
-                    setattr(subj, key, value)
-
-        req.set_pubkey(pkey)
-        req.sign(pkey, digest)
-        return req
-
-    def create_cert(self):
-        pass
-
 
     def _create_rootcert(self):
         #create certs directory
@@ -177,15 +136,102 @@ class Ssltools(object):
         print "  [Create req]"
         if not os.path.exists("%s/%s" % (self.certs_path, self.rootcert_name)):
                 subject=dict(item.split("=") for item in self.subject.split("/"))
-                print subject
                 req=self.create_req(pkey, **subject)
 
 
         print "  [Create %s]" % self.rootcert_name
+
         if not os.path.exists("%s/%s" % (self.certs_path, self.rootcert_name)):
-                cert=self.create_cert()
+                #write srl file with 0 (first cert)
+                print "    write serial 0 in %s/%s" % (self.certs_path, self.srl_file)
+                self.write_serial(self.certs_path, self.srl_file, 0)
+                #Create cert with request
+                cert=self.create_cert(req, (req, pkey), 0, (0, 60*60*24*int(self.days)),certs_path=self.certs_path,cert_name=self.rootcert_name)
         else:
                 print "    %s/%s Already exist [Keep the existing]" % (self.certs_path, self.rootcert_name)
+                #TODO read the cert
+
+
+    def create_pkey(self,certs_path,pkey_name):
+        """
+        Create private key.
+        Arguments: certs_path - Certificats directory
+                   pkey_name - Name for the private key
+        Returns:   The private key generated
+        """
+        pkey = crypto.PKey()
+        pkey.generate_key(TYPE_RSA, self.bits)
+        open("%s/%s" % (certs_path, pkey_name), 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
+        return pkey
+
+    def create_req(self, pkey, digest="md5", **subject):
+        """
+        Create a certificate request.
+        Arguments: pkey   - The key to associate with the request
+                   digest - Digestion method to use for signing, default is md5
+                   **subject - The name of the subject of the request, possible
+                            arguments are:
+                                                          C     - Country subject
+                              ST    - State or province subject
+                              L     - Locality subject
+                              O     - Organization subject
+                              OU    - Organizational unit subject
+                              CN    - Common subject
+                              emailAddress - E-mail address
+        Returns:   The certificate request in an X509Req object
+        """
+
+        req = crypto.X509Req()
+        subj = req.get_subject()
+
+        for (key,value) in subject.items():
+                    setattr(subj, key, value)
+
+        req.set_pubkey(pkey)
+        req.sign(pkey, digest)
+        return req
+
+    #cacert = createCertificate(careq, (careq, cakey), 0, (0, 60*60*24*365*5)) # five years
+    #cert = createCertificate(req, (cacert, cakey), 1, (0, 60*60*24*365*5)) # five years
+    def create_cert(self, req, (issuerCert, issuerKey), serial, (notBefore, notAfter), certs_path,cert_name, digest="md5"):
+        """
+        Generate a certificate given a certificate request.
+        Arguments: req        - Certificate reqeust to use
+                   issuerCert - The certificate of the issuer
+                   issuerKey  - The private key of the issuer
+                   serial     - Serial number for the certificate
+                   notBefore  - Timestamp (relative to now) when the certificate
+                                starts being valid
+                   notAfter   - Timestamp (relative to now) when the certificate
+                                stops being valid
+                   digest     - Digest method to use for signing, default is md5
+        Returns:   The signed certificate in an X509 object
+        """
+
+        cert = crypto.X509()
+        cert.set_serial_number(serial)
+        cert.gmtime_adj_notBefore(notBefore)
+        cert.gmtime_adj_notAfter(notAfter)
+        cert.set_issuer(issuerCert.get_subject())
+        cert.set_subject(req.get_subject())
+        cert.set_pubkey(req.get_pubkey())
+        cert.sign(issuerKey, digest)
+
+        open("%s/%s" % (certs_path, cert_name), 'w').write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+
+        return cert
+
+    def get_serial(self, certs_path, srl_file):
+        if not os.path.exists("%s/%s" % (certs_path, srl_file)):
+                print "    %s/%s Not exist. [Creating file ...]" % (certs_path, srl_file)
+                self.write_serial(certs_path, srl_file, 0)
+                return 0
+
+        return int(open("%s/%s" % (certs_path, srl_file), 'r').read())
+
+    def write_serial(self, certs_path, srl_file, serial):
+        open("%s/%s" % (certs_path, srl_file), 'w').write(str(serial))
+
 
    # def _auth(self):
    #     cmd = ("oc login %s:%s -u%s -p%s --insecure-skip-tls-verify=True 2>&1 > /dev/null"
