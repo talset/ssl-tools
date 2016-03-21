@@ -91,21 +91,19 @@ class Ssltools(object):
         self.rootcert_name = rootcert_name
         self.rootkey_name = rootkey_name
         self.cn_rootcert = cn_rootcert
-        self.cert_name = rootcert_name
-        self.key_name = rootkey_name
+        self.cert_name = cert_name
+        self.key_name = key_name
         self.srl_file = srl_file
         self.certs_path = certs_path
 
-        self._create_rootcert()
-        #create_rootcert()
         #root CA and key
-        #openssl genrsa -out ca.key 4096
-        #openssl req -days 3650 -out ca.pem -new -x509 -subj /C=FR/L=Paris/O=redhat/OU=redhat
+        (rootCA, rootKEY)=self._create_rootcert()
 
 
+        #root CA and key
+        self._create_sign_cert(rootCA, rootKEY)
 
-
-        #create_req_cert()
+        #self.create_req_cert()
         #openssl genrsa -out test.key 2048
         #openssl req -days 3650 -key test.key -new -out test.req -subj /C=FR/L=Paris/O=redhat/OU=redhat/CN=*.mydomain.com
 
@@ -134,9 +132,8 @@ class Ssltools(object):
 
 
         print "  [Create req]"
-        if not os.path.exists("%s/%s" % (self.certs_path, self.rootcert_name)):
-                subject=dict(item.split("=") for item in self.subject.split("/"))
-                req=self.create_req(pkey, **subject)
+        subject=dict(item.split("=") for item in self.subject.split("/"))
+        req=self.create_req(pkey, **subject)
 
 
         print "  [Create %s]" % self.rootcert_name
@@ -151,6 +148,49 @@ class Ssltools(object):
                 print "    %s/%s Already exist [Keep the existing]" % (self.certs_path, self.rootcert_name)
                 existing_cert=open("%s/%s" % (self.certs_path, self.rootcert_name), 'r').read()
                 cert=crypto.load_certificate(crypto.FILETYPE_PEM, existing_cert)
+
+        return (cert, pkey)
+
+    def _create_sign_cert(self,rootCA, rootKEY):
+        #create certs directory
+        print "[Create serverCert/Key]" 
+        if not os.path.exists(self.certs_path):
+                os.makedirs(self.certs_path)
+
+        print "  [Get new Serial]"
+        #get the last and +1
+        serial=(int(self.get_serial(self.certs_path, self.srl_file))+1)
+        print "    New serial is %s" % serial
+        print "  [Write the new Serial]"
+        self.write_serial(self.certs_path, self.srl_file, serial)
+
+        cert_name="%s_%s" % (serial, self.cert_name)
+        key_name="%s_%s" % (serial, self.key_name)
+
+        print "  [Create %s]" % key_name
+        if not os.path.exists("%s/%s" % (self.certs_path, key_name)):
+                pkey=self.create_pkey(certs_path=self.certs_path, pkey_name=key_name)
+        else:
+                print "    %s/%s Already exist [Fail]" % (self.certs_path, key_name)
+                sys.exit(1)
+
+
+        print "  [Create req]"
+        subject=dict(item.split("=") for item in self.subject.split("/"))
+        subject.update({'CN': self.cn})
+        #TODO Add CN and SAN
+        req=self.create_req(pkey, **subject)
+
+
+        print "  [Create %s]" % cert_name
+
+        if not os.path.exists("%s/%s" % (self.certs_path, cert_name)):
+                #Create cert with request
+                cert=self.create_cert(req, (rootCA, rootKEY), serial, (0, 60*60*24*int(self.days)),certs_path=self.certs_path,cert_name=cert_name)
+        else:
+                print "    %s/%s Already exist [Fail]" % (self.certs_path, cert_name)
+                sys.exit(1)
+
 
 
     def create_pkey(self,certs_path,pkey_name):
@@ -172,7 +212,7 @@ class Ssltools(object):
                    digest - Digestion method to use for signing, default is md5
                    **subject - The name of the subject of the request, possible
                             arguments are:
-                                                          C     - Country subject
+                              C     - Country subject
                               ST    - State or province subject
                               L     - Locality subject
                               O     - Organization subject
