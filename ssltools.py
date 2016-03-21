@@ -50,8 +50,12 @@ PARSER.add_argument("-b", "--bits", type=int,
                     help='Key size (Default : 4096)',
                     default=4096)
 
+PARSER.add_argument("-va", "--verify-auto", type=str,
+                    help='Determine if it is a key or cert and run the good verify')
 PARSER.add_argument("-vk", "--verify-key", type=str,
-                    help='Print the contenant of a key')
+                    help='Print the details of a key')
+PARSER.add_argument("-vc", "--verify-certificate", type=str,
+                    help='Print the details of a cert')
 
 PARSER.add_argument("-v", "--version", action='store_true',
                     help='Print script version')
@@ -302,16 +306,42 @@ class Ssltools(object):
         print "Bits: %s" % pkey.bits()
         print "Consistency: %s" % pkey.check()
 
+    def verify_certificate(self, cert_path):
+        print cert_path
+        existing_cert=open("%s" % (cert_path), 'r').read()
+        cert=crypto.load_certificate(crypto.FILETYPE_PEM, existing_cert)
+
+        print "Digest md5 %s " % cert.digest('md5')
+        for i in range(0,cert.get_extension_count()) :
+                print "Extention %s " % cert.get_extension(i)
+        #TODO return X509Name
+        print "Issuer %s " % cert.get_issuer()
+        #TODO timestamp YYYYMMDDhhmmssZ  YYYYMMDDhhmmss+hhmm  YYYYMMDDhhmmss-hhmm
+        print "Certificate stops being valid %s " % cert.get_notAfter()
+        print "Certificate starts being valid %s " % cert.get_notBefore()
+        print "Expired ? %s " % cert.has_expired()
+        #TODO : pubkey ?
+        print "Pub key %s " % cert.get_pubkey()
+        print "Serial number: %s " % cert.get_serial_number()
+        print "Signature algorithm: %s " % cert.get_signature_algorithm()
+        #TODO subject
+        print "Subject: %s " % cert.get_subject()
+        print "Version: %s " % cert. get_version()
+
         #FILETYPE_ASN1 = 2
         #FILETYPE_PEM = 1
         #FILETYPE_TEXT = 65535
 
+    def verify_auto(self, path_file):
 
-      #if key.startswith('-----BEGIN '):
-      #            pkey = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
-      #else:
-      #            pkey = crypto.load_pkcs12(key, password).get_privatekey()
-      #return OpenSSLSigner(pkey)
+        file=open("%s" % (path_file), 'r').read()
+        if file.startswith('-----BEGIN CERTIFICATE'):
+                self.verify_certificate(path_file)
+        elif file.startswith('-----BEGIN PRIVATE'):
+                self.verify_key(path_file)
+        else:
+                print "Can't find the type of %s" % path_file
+
 
    # def _auth(self):
    #     cmd = ("oc login %s:%s -u%s -p%s --insecure-skip-tls-verify=True 2>&1 > /dev/null"
@@ -333,8 +363,14 @@ if __name__ == "__main__":
 
     tools = Ssltools()
 
+    if ARGS.verify_auto:
+        tools.verify_auto(ARGS.verify_auto)
+
     if ARGS.verify_key:
         tools.verify_key(ARGS.verify_key)
+
+    if ARGS.verify_certificate:
+        tools.verify_certificate(ARGS.verify_certificate)
 
     if ARGS.gencert:
         tools.gen_cert(subject=ARGS.subject,
