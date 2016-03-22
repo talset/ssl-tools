@@ -200,6 +200,9 @@ class Ssltools(object):
                 print "    %s/%s Already exist [Fail]" % (self.certs_path, cert_name)
                 sys.exit(1)
 
+        chain_cert="%s_chain_%s" % (serial, self.cert_name)
+        print "  [Create Chain %s]" % chain_cert
+
 
 
     def create_pkey(self,certs_path,pkey_name):
@@ -313,9 +316,9 @@ class Ssltools(object):
 
         print "Digest md5 %s " % cert.digest('md5')
         for i in range(0,cert.get_extension_count()) :
-                print "Extention %s " % cert.get_extension(i)
-        #TODO return X509Name
-        print "Issuer %s " % cert.get_issuer()
+              print "Extention %s " % cert.get_extension(i)
+
+        print "Issuer %s " % ('/'.join('{}={}'.format(key, val) for key, val in cert.get_issuer().get_components()))
         #TODO timestamp YYYYMMDDhhmmssZ  YYYYMMDDhhmmss+hhmm  YYYYMMDDhhmmss-hhmm
         print "Certificate stops being valid %s " % cert.get_notAfter()
         print "Certificate starts being valid %s " % cert.get_notBefore()
