@@ -20,6 +20,8 @@
 import sys
 import argparse
 import subprocess
+import time
+from datetime import datetime
 
 import os
 from OpenSSL import crypto
@@ -310,10 +312,12 @@ class Ssltools(object):
         for i in range(0,cert.get_extension_count()) :
               print "Extention %s " % cert.get_extension(i)
 
-        print "Issuer %s " % ('/'.join('{}={}'.format(key, val) for key, val in cert.get_issuer().get_components()))
-        #TODO timestamp YYYYMMDDhhmmssZ  YYYYMMDDhhmmss+hhmm  YYYYMMDDhhmmss-hhmm
-        print "Certificate stops being valid %s " % cert.get_notAfter()
-        print "Certificate starts being valid %s " % cert.get_notBefore()
+        print "Issuer %s " % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_issuer().get_components()]))
+
+        valid_notAfter=datetime.fromtimestamp(time.mktime(time.strptime(cert.get_notAfter(), "%Y%m%d%H%M%SZ")))
+        valid_notBefore=datetime.fromtimestamp(time.mktime(time.strptime(cert.get_notBefore(), "%Y%m%d%H%M%SZ")))
+        print "Certificate starts being valid %s " % valid_notBefore.strftime("%Y-%m-%d %Hh%Mm%S")
+        print "Certificate stops being valid %s " % valid_notAfter.strftime("%Y-%m-%d %Hh%Mm%S")
         print "Expired ? %s " % cert.has_expired()
         #TODO : pubkey ?
         print "Pub key %s " % cert.get_pubkey()
