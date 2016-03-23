@@ -112,18 +112,6 @@ class Ssltools(object):
         #root CA and key
         self._create_sign_cert(rootCA, rootKEY)
 
-        #self.create_req_cert()
-        #openssl genrsa -out test.key 2048
-        #openssl req -days 3650 -key test.key -new -out test.req -subj /C=FR/L=Paris/O=redhat/OU=redhat/CN=*.mydomain.com
-
-        #update_srl
-        #echo '00' > file.srl
-
-        #create_cert
-        #openssl x509 -req -days 3650 -in test.req -CA ca.pem -CAkey privkey.pem -CAserial file.srl -out test.pem
-
-        #gen_chain_cert
-        #cat test.pem test.key ca.pem > chain_test.pem
 
     def _create_rootcert(self):
         #create certs directory
@@ -202,7 +190,11 @@ class Ssltools(object):
 
         chain_cert="%s_chain_%s" % (serial, self.cert_name)
         print "  [Create Chain %s]" % chain_cert
-
+        #get the txt version to write the chain cert
+        txt_key=crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey)
+        txt_cert=crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+        txt_cacert=crypto.dump_certificate(crypto.FILETYPE_PEM, rootCA)
+        open("%s/%s" % (self.certs_path, chain_cert), 'w').write("%s\n%s\n%s" % (txt_cert,txt_key,txt_cacert))
 
 
     def create_pkey(self,certs_path,pkey_name):
