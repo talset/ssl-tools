@@ -41,10 +41,10 @@ PARSER.add_argument("-s", "--subject", type=str,
 PARSER.add_argument("-cn", "--common-name", type=str,
                     help='CommonName (Default : *.rcip.redhat.com)',
                     default="*.rcip.redhat.com")
-PARSER.add_argument("-ip", "--sanip", type=str,
-                    help='Subject Alternative Name IP ex: 127.0.0.1,10.100.0.1')
-PARSER.add_argument("-dns", "--sandns", type=str,
-                    help='Subject Alternative Name DNS ex: localhost,example.com')
+PARSER.add_argument("-ip", "--sanip", type=str, nargs='+', default=[],
+                    help='Subject Alternative Name IP ex: 127.0.0.1 10.100.0.1')
+PARSER.add_argument("-dns", "--sandns", type=str, nargs='+', default=[],
+                    help='Subject Alternative Name DNS ex: localhost example.com example2.com')
 PARSER.add_argument("-d", "--days", type=int,
                     help='specifies the number of days to make a certificate valid for. (Default : 3650)',
                     default=3650)
@@ -112,7 +112,7 @@ class Ssltools(object):
 
 
         #root CA and key
-        self._create_sign_cert(rootCA, rootKEY)
+        self._create_sign_cert(rootCA, rootKEY, self.sandns, self.sanip)
 
 
     def _create_rootcert(self):
@@ -150,7 +150,7 @@ class Ssltools(object):
 
         return (cert, pkey)
 
-    def _create_sign_cert(self,rootCA, rootKEY):
+    def _create_sign_cert(self, rootCA, rootKEY, sandns, sanip):
         #create certs directory
         print "[Create serverCert/Key]" 
         if not os.path.exists(self.certs_path):
@@ -167,11 +167,11 @@ class Ssltools(object):
         key_name="%s_%s" % (serial, self.key_name)
 
         print "  [Create %s]" % key_name
-        if not os.path.exists("%s/%s" % (self.certs_path, key_name)):
-                pkey=self.create_pkey(certs_path=self.certs_path, pkey_name=key_name)
-        else:
+        if os.path.exists("%s/%s" % (self.certs_path, key_name)):
                 print "    %s/%s Already exist [Fail]" % (self.certs_path, key_name)
                 sys.exit(1)
+
+        pkey=self.create_pkey(certs_path=self.certs_path, pkey_name=key_name)
 
 
         print "  [Create req]"
@@ -183,12 +183,12 @@ class Ssltools(object):
 
         print "  [Create %s]" % cert_name
 
-        if not os.path.exists("%s/%s" % (self.certs_path, cert_name)):
-                #Create cert with request
-                cert=self.create_cert(req, (rootCA, rootKEY), serial, (0, 60*60*24*int(self.days)),certs_path=self.certs_path,cert_name=cert_name)
-        else:
+        if os.path.exists("%s/%s" % (self.certs_path, cert_name)):
                 print "    %s/%s Already exist [Fail]" % (self.certs_path, cert_name)
                 sys.exit(1)
+
+        #Create cert with request
+        cert=self.create_cert(req, (rootCA, rootKEY), serial, (0, 60*60*24*int(self.days)),certs_path=self.certs_path,cert_name=cert_name, sandns=sandns, sanip=sanip)
 
         chain_cert="%s_chain_%s" % (serial, self.cert_name)
         print "  [Create Chain %s]" % chain_cert
@@ -234,17 +234,11 @@ class Ssltools(object):
         for (key,value) in subject.items():
                     setattr(subj, key, value)
 
-        #TODO san
-        extention=crypto.X509Extension(type_name="subjectAltName", critical=False, value="IP:192.168.7.1")
-        req.add_extensions([extention])
-
         req.set_pubkey(pkey)
         req.sign(pkey, digest)
         return req
 
-    #cacert = createCertificate(careq, (careq, cakey), 0, (0, 60*60*24*365*5)) # five years
-    #cert = createCertificate(req, (cacert, cakey), 1, (0, 60*60*24*365*5)) # five years
-    def create_cert(self, req, (issuerCert, issuerKey), serial, (notBefore, notAfter), certs_path,cert_name, digest="md5"):
+    def create_cert(self, req, (issuerCert, issuerKey), serial, (notBefore, notAfter), certs_path,cert_name, sandns=[], sanip=[], digest="md5"):
         """
         Generate a certificate given a certificate request.
         Arguments: req        - Certificate reqeust to use
@@ -259,7 +253,17 @@ class Ssltools(object):
         Returns:   The signed certificate in an X509 object
         """
 
+
         cert = crypto.X509()
+        extensions = []
+
+        san=["DNS:%s" % dns for dns in sandns]
+        san+=["IP:%s" % ip for ip in sanip]
+
+        if san:
+                extensions.append(crypto.X509Extension("subjectAltName", critical=False, value=', '.join(san)))
+                cert.add_extensions(extensions)
+
         cert.set_serial_number(serial)
         cert.gmtime_adj_notBefore(notBefore)
         cert.gmtime_adj_notAfter(notAfter)
@@ -312,7 +316,8 @@ class Ssltools(object):
         existing_cert=open("%s" % (cert_path), 'r').read()
         cert=crypto.load_certificate(crypto.FILETYPE_PEM, existing_cert)
 
-        print "Digest md5: %s" % cert.digest('md5')
+
+        print "Subject: %s" % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_subject().get_components()]))
         for i in range(0,cert.get_extension_count()) :
             print "Extention: %s" % cert.get_extension(i)
 
@@ -323,6 +328,9 @@ class Ssltools(object):
         print "Certificate starts being valid: %s" % valid_notBefore.strftime("%Y-%m-%d %Hh%Mm%S")
         print "Certificate stops being valid: %s" % valid_notAfter.strftime("%Y-%m-%d %Hh%Mm%S")
         print "Expired: %s" % cert.has_expired()
+
+        print "Digest md5: %s" % cert.digest('md5')
+        print "Signature algorithm: %s" % cert.get_signature_algorithm()
 
         #pub key type
         pubkey=cert.get_pubkey()
@@ -336,8 +344,6 @@ class Ssltools(object):
         print "Pub key bits: %s" % pubkey.bits()
 
         print "Serial number: %s" % cert.get_serial_number()
-        print "Signature algorithm: %s" % cert.get_signature_algorithm()
-        print "Subject: %s" % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_subject().get_components()]))
         print "Version: %s" % cert.get_version()
 
     def verify_auto(self, path_file):
