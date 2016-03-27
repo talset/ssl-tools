@@ -14,7 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 #
-# Requirments: python
+# Requirments: python build-essential libssl-dev libffi-dev python-dev
 #
 
 import sys
@@ -234,6 +234,10 @@ class Ssltools(object):
         for (key,value) in subject.items():
                     setattr(subj, key, value)
 
+        #TODO san
+        extention=crypto.X509Extension(type_name="subjectAltName", critical=False, value="IP:192.168.7.1")
+        req.add_extensions([extention])
+
         req.set_pubkey(pkey)
         req.sign(pkey, digest)
         return req
@@ -308,28 +312,33 @@ class Ssltools(object):
         existing_cert=open("%s" % (cert_path), 'r').read()
         cert=crypto.load_certificate(crypto.FILETYPE_PEM, existing_cert)
 
-        print "Digest md5 %s " % cert.digest('md5')
+        print "Digest md5: %s" % cert.digest('md5')
         for i in range(0,cert.get_extension_count()) :
-              print "Extention %s " % cert.get_extension(i)
+            print "Extention: %s" % cert.get_extension(i)
 
-        print "Issuer %s " % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_issuer().get_components()]))
+        print "Issuer: %s" % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_issuer().get_components()]))
 
         valid_notAfter=datetime.fromtimestamp(time.mktime(time.strptime(cert.get_notAfter(), "%Y%m%d%H%M%SZ")))
         valid_notBefore=datetime.fromtimestamp(time.mktime(time.strptime(cert.get_notBefore(), "%Y%m%d%H%M%SZ")))
-        print "Certificate starts being valid %s " % valid_notBefore.strftime("%Y-%m-%d %Hh%Mm%S")
-        print "Certificate stops being valid %s " % valid_notAfter.strftime("%Y-%m-%d %Hh%Mm%S")
-        print "Expired ? %s " % cert.has_expired()
-        #TODO : pubkey ?
-        print "Pub key %s " % cert.get_pubkey()
-        print "Serial number: %s " % cert.get_serial_number()
-        print "Signature algorithm: %s " % cert.get_signature_algorithm()
-        #TODO subject
-        print "Subject: %s " % cert.get_subject()
-        print "Version: %s " % cert. get_version()
+        print "Certificate starts being valid: %s" % valid_notBefore.strftime("%Y-%m-%d %Hh%Mm%S")
+        print "Certificate stops being valid: %s" % valid_notAfter.strftime("%Y-%m-%d %Hh%Mm%S")
+        print "Expired: %s" % cert.has_expired()
 
-        #FILETYPE_ASN1 = 2
-        #FILETYPE_PEM = 1
-        #FILETYPE_TEXT = 65535
+        #pub key type
+        pubkey=cert.get_pubkey()
+        if pubkey.type() == 6:
+                pubktype='RSA'
+        elif pubkey.type() == 116:
+                pubktype='DSA'
+        else:
+                ktype='Unknow'
+        print "Pub key Type: %s" % pubktype
+        print "Pub key bits: %s" % pubkey.bits()
+
+        print "Serial number: %s" % cert.get_serial_number()
+        print "Signature algorithm: %s" % cert.get_signature_algorithm()
+        print "Subject: %s" % ('/'.join(['%s=%s' % (k, v) for k, v in cert.get_subject().get_components()]))
+        print "Version: %s" % cert.get_version()
 
     def verify_auto(self, path_file):
 
