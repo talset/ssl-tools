@@ -60,12 +60,12 @@ optional arguments:
 Generate a CA and Server cert with cn and SAN (dns and ips)
 
 ```bash
-ssltools.py -gen -cn *.foo.com -dns foo.bar.com foo.bla.com -ip 127.0.0.1 10.1.0.1
+python ssltools.py -gen -cn *.foo.com -dns foo.bar.com foo.bla.com -ip 127.0.0.1 10.1.0.1
 ```
 
 Create a second Server cert signed by the previous CA (by default it use the same certs/ca.crt)
 ```bash
-ssltools.py -gen -cn *.fii.com -dns fii.bar.com fii.bla.com -ip 127.0.0.1 10.1.0.1
+python ssltools.py -gen -cn *.fii.com -dns fii.bar.com fii.bla.com -ip 127.0.0.1 10.1.0.1
 ```
 
 Display details of the server key
