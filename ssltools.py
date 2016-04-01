@@ -60,6 +60,8 @@ PARSER.add_argument("-vc", "--verify-certificate", type=str,
                     help='Print the details of a cert')
 PARSER.add_argument("--validate-cert-with-ca", type=str, nargs=2, default=[],
         help='Is the cert is correcly validated by the rootca ? rootca.crt server.crt')
+PARSER.add_argument("--validate-pkey-with-cert", type=str, nargs=2, default=[],
+        help='Verifying that a Private Key Matches a Certificate : server.key server.crt')
 
 PARSER.add_argument("-v", "--version", action='store_true',
                     help='Print script version')
@@ -364,9 +366,18 @@ class Ssltools(object):
         stdout = subprocess.check_output(cmd, shell=True)
         print stdout
 
-    def validate_pkey_with_cert(self):
-        print "Verifying that a Private Key Matches a Certificate"
+    def validate_pkey_with_cert(self, pkey, cert):
+        """
+          Verifying that a Private Key Matches a Certificate
+        """
+        print "Private Key: %s\nCertificate: %s\n" % (pkey, cert)
         #(openssl x509 -noout -modulus -in server.pem | openssl md5 ; openssl rsa -noout -modulus -in server.key | openssl md5) | uniq
+        cmd = "(openssl x509 -noout -modulus -in %s | openssl md5 ; openssl rsa -noout -modulus -in %s | openssl md5) | uniq" % (cert, pkey)
+        stdout = subprocess.check_output(cmd, shell=True).rstrip('\n')
+        if len(stdout.split('\n')) == 1:
+                print "Private Key and Certificate [Match]"
+        else:
+                print "Private Key and Certificate [UnMatch]"
 
 if __name__ == "__main__":
 
@@ -387,6 +398,9 @@ if __name__ == "__main__":
 
     if ARGS.validate_cert_with_ca:
         tools.validate_cert_with_ca(ARGS.validate_cert_with_ca[0], ARGS.validate_cert_with_ca[1])
+
+    if ARGS.validate_pkey_with_cert:
+        tools.validate_pkey_with_cert(ARGS.validate_pkey_with_cert[0], ARGS.validate_pkey_with_cert[1])
 
     if ARGS.gencert:
         tools.gen_cert(subject=ARGS.subject,
