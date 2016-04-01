@@ -58,6 +58,8 @@ PARSER.add_argument("-vk", "--verify-key", type=str,
                     help='Print the details of a key')
 PARSER.add_argument("-vc", "--verify-certificate", type=str,
                     help='Print the details of a cert')
+PARSER.add_argument("--validate-cert-with-ca", type=str, nargs=2, default=[],
+        help='Is the cert is correcly validated by the rootca ? rootca.crt server.crt')
 
 PARSER.add_argument("-v", "--version", action='store_true',
                     help='Print script version')
@@ -355,19 +357,16 @@ class Ssltools(object):
                 self.verify_key(path_file)
         else:
                 print "Can't find the type of %s" % path_file
+    def validate_cert_with_ca(self, rootCA, cert):
+        print "validate_cert_with_ca: %s %s" % (rootCA, cert)
 
+        cmd = "openssl verify -CAfile %s %s" % (rootCA, cert)
+        stdout = subprocess.check_output(cmd, shell=True)
+        print stdout
 
-   # def _auth(self):
-   #     cmd = ("oc login %s:%s -u%s -p%s --insecure-skip-tls-verify=True 2>&1 > /dev/null"
-   #            % (self.host, self.port, self.username, self.password))
-   #     subprocess.check_output(cmd, shell=True)
-
-   #     cmd = "oc whoami -t"
-   #     stdout = subprocess.check_output(cmd, shell=True)
-
-   #     return stdout.strip()
-
-
+    def validate_pkey_with_cert(self):
+        print "Verifying that a Private Key Matches a Certificate"
+        #(openssl x509 -noout -modulus -in server.pem | openssl md5 ; openssl rsa -noout -modulus -in server.key | openssl md5) | uniq
 
 if __name__ == "__main__":
 
@@ -385,6 +384,9 @@ if __name__ == "__main__":
 
     if ARGS.verify_certificate:
         tools.verify_certificate(ARGS.verify_certificate)
+
+    if ARGS.validate_cert_with_ca:
+        tools.validate_cert_with_ca(ARGS.validate_cert_with_ca[0], ARGS.validate_cert_with_ca[1])
 
     if ARGS.gencert:
         tools.gen_cert(subject=ARGS.subject,
