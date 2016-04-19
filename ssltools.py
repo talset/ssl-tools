@@ -95,7 +95,8 @@ class Ssltools(object):
                  cert_name="server.crt",
                  key_name="server.key",
                  srl_file="file.srl",
-                 certs_path="./certs"):
+                 certs_path="./certs",
+                 certs_digest="sha256"):
 
         self.subject = subject
         self.cn = cn
@@ -110,6 +111,7 @@ class Ssltools(object):
         self.key_name = key_name
         self.srl_file = srl_file
         self.certs_path = certs_path
+        self.certs_digest = certs_digest
 
         #root CA and key
         (rootCA, rootKEY)=self._create_rootcert()
@@ -215,11 +217,11 @@ class Ssltools(object):
         open("%s/%s" % (certs_path, pkey_name), 'w').write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
         return pkey
 
-    def create_req(self, pkey, digest="md5", **subject):
+    def create_req(self, pkey, digest=None, **subject):
         """
         Create a certificate request.
         Arguments: pkey   - The key to associate with the request
-                   digest - Digestion method to use for signing, default is md5
+                   digest - Digestion method to use for signing, default is self.certs_digest
                    **subject - The name of the subject of the request, possible
                             arguments are:
                               C     - Country subject
@@ -231,7 +233,8 @@ class Ssltools(object):
                               emailAddress - E-mail address
         Returns:   The certificate request in an X509Req object
         """
-
+        if digest is None:
+            digest = self.certs_digest
         req = crypto.X509Req()
         subj = req.get_subject()
 
@@ -242,7 +245,7 @@ class Ssltools(object):
         req.sign(pkey, digest)
         return req
 
-    def create_cert(self, req, (issuerCert, issuerKey), serial, (notBefore, notAfter), certs_path,cert_name, sandns=[], sanip=[], digest="md5"):
+    def create_cert(self, req, (issuerCert, issuerKey), serial, (notBefore, notAfter), certs_path,cert_name, sandns=[], sanip=[], digest=None):
         """
         Generate a certificate given a certificate request.
         Arguments: req        - Certificate reqeust to use
@@ -253,10 +256,12 @@ class Ssltools(object):
                                 starts being valid
                    notAfter   - Timestamp (relative to now) when the certificate
                                 stops being valid
-                   digest     - Digest method to use for signing, default is md5
+                   digest     - Digest method to use for signing, default is self.certs_digest
         Returns:   The signed certificate in an X509 object
         """
 
+        if digest is None:
+            digest = self.certs_digest  
 
         cert = crypto.X509()
         extensions = []
@@ -333,7 +338,14 @@ class Ssltools(object):
         print "Certificate stops being valid: %s" % valid_notAfter.strftime("%Y-%m-%d %Hh%Mm%S")
         print "Expired: %s" % cert.has_expired()
 
-        print "Digest md5: %s" % cert.digest('md5')
+        if cert.get_signature_algorithm() == "sha256WithRSAEncryption":
+            digest = "sha256"
+        elif cert.get_signature_algorithm() == "md5WithRSAEncryption":
+            digest = "md5"
+        else:
+            digest = "sha256"
+
+        print "Digest %s: %s" % (digest, cert.digest(digest))
         print "Signature algorithm: %s" % cert.get_signature_algorithm()
 
         #pub key type
