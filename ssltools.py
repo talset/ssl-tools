@@ -29,7 +29,7 @@ from OpenSSL import crypto
 TYPE_RSA = crypto.TYPE_RSA
 
 
-VERSION = '1.0'
+VERSION = '1.1'
 
 PARSER = argparse.ArgumentParser(description='Openssl tools')
 
@@ -274,6 +274,7 @@ class Ssltools(object):
                 cert.add_extensions(extensions)
 
         cert.set_serial_number(serial)
+        cert.set_version(2)
         cert.gmtime_adj_notBefore(notBefore)
         cert.gmtime_adj_notAfter(notAfter)
         cert.set_issuer(issuerCert.get_subject())
