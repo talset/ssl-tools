@@ -400,6 +400,9 @@ if __name__ == "__main__":
 
     tools = Ssltools()
 
+    if len(sys.argv) <= 1:
+        PARSER.print_help()
+
     if ARGS.verify_auto:
         tools.verify_auto(ARGS.verify_auto)
 
