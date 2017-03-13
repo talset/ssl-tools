@@ -21,10 +21,14 @@ Script tested with pyOpenSSL==16.0.0
 
 ```bash
 python ssltools.py -h
+
 usage: ssltools.py [-h] [-gen] [-s SUBJECT] [-cn COMMON_NAME]
                    [-ip SANIP [SANIP ...]] [-dns SANDNS [SANDNS ...]]
                    [-d DAYS] [-b BITS] [-va VERIFY_AUTO] [-vk VERIFY_KEY]
-                   [-vc VERIFY_CERTIFICATE] [-v]
+                   [-vc VERIFY_CERTIFICATE]
+                   [--validate-cert-with-ca VALIDATE_CERT_WITH_CA VALIDATE_CERT_WITH_CA]
+                   [--validate-pkey-with-cert VALIDATE_PKEY_WITH_CERT VALIDATE_PKEY_WITH_CERT]
+                   [-v]
 
 Openssl tools
 
@@ -52,6 +56,12 @@ optional arguments:
                         Print the details of a key
   -vc VERIFY_CERTIFICATE, --verify-certificate VERIFY_CERTIFICATE
                         Print the details of a cert
+  --validate-cert-with-ca VALIDATE_CERT_WITH_CA VALIDATE_CERT_WITH_CA
+                        Is the cert is correcly validated by the rootca ?
+                        rootca.crt server.crt
+  --validate-pkey-with-cert VALIDATE_PKEY_WITH_CERT VALIDATE_PKEY_WITH_CERT
+                        Verifying that a Private Key Matches a Certificate :
+                        server.key server.crt
   -v, --version         Print script version
 ```
 
@@ -100,4 +110,22 @@ You can also use --verify-auto it will read the begining of the file to determin
 ```bash
 python ssltools.py -va certs/1_server.key
 python ssltools.py -va certs/1_server.crt
+```
+
+Verifying that a Private Key Matches a Certificate
+
+```bash
+ssltools --validate-cert-with-ca ca.pem apiserver.pem
+validate_cert_with_ca: ca.pem apiserver.pem
+apiserver.pem: OK
+```
+
+Verifying that a Private Key Matches a Certificate
+
+```bash
+ssltools --validate-pkey-with-cert admin-key.pem admin.pem
+Private Key: admin-key.pem
+Certificate: admin.pem
+
+Private Key and Certificate [Match]
 ```
