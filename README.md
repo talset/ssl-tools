@@ -112,7 +112,7 @@ python ssltools.py -va certs/1_server.key
 python ssltools.py -va certs/1_server.crt
 ```
 
-Verifying that a Private Key Matches a Certificate
+Is the cert is correcly validated by the rootca
 
 ```bash
 ssltools --validate-cert-with-ca ca.pem apiserver.pem
